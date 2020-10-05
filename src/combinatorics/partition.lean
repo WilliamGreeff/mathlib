@@ -6,6 +6,7 @@ Authors: Bhavik Mehta
 
 import combinatorics.composition
 import data.nat.parity
+import data.finsupp.basic
 import tactic.apply_fun
 
 /-!
@@ -104,9 +105,9 @@ begin
   { rw [filter_cons_of_neg _ h₁, ih] }
 end
 
-lemma count_of_sums_of_ne_zero {n : ℕ} {l : multiset ℕ} (hl : l.sum = n) {i : ℕ} (hi : i ≠ 0) :
-  (of_sums n l hl).parts.count i = l.count i :=
-count_filter hi
+-- lemma count_of_sums_of_ne_zero {n : ℕ} {l : multiset ℕ} (hl : l.sum = n) {i : ℕ} (hi : i ≠ 0) :
+--   (of_sums n l hl).parts.count i = l.count i :=
+-- count_filter hi
 
 lemma count_of_sums_zero {n : ℕ} {l : multiset ℕ} (hl : l.sum = n) :
   (of_sums n l hl).parts.count 0 = 0 :=
@@ -129,10 +130,46 @@ structure diagram :=
 (lc : ∀ i j, (i+1,j) ∈ vals → (i,j) ∈ vals)
 (uc : ∀ i j, (i,j+1) ∈ vals → (i,j) ∈ vals)
 
-def conj (d : diagram) : diagram :=
-{ vals := d.vals.image (prod.swap),
+def test2 : diagram :=
+⟨list.to_finset [(0,0), (1,0), (2,0), (3,0), (4,0), (0,1), (1,1), (2,1), (3,1), (0,2)], sorry, sorry⟩
 
-}
+#eval test2.vals.1.map prod.snd
+
+def increasing_list_to_diagram (l : list ℕ) : list (ℕ × ℕ) :=
+(l.map_with_index (λ i v, (list.range v).map (λ t, (i, t)))).join
+
+lemma inc_list_nodup (l : list ℕ) : (increasing_list_to_diagram l).nodup :=
+begin
+  rw [increasing_list_to_diagram, list.nodup_join],
+  split,
+  { intros l₁ hl₁,
+
+  }
+
+end
+
+-- def partition_to_diagram {n : ℕ} (p : partition n) : diagram :=
+-- { vals :=
+--   begin
+
+--   end
+
+-- }
+
+-- def diagram_to_partition {n : ℕ} (d : diagram) (hd : d.vals.card = n) :
+--   partition n :=
+-- { parts :=
+--   begin
+
+--     -- have := d.vals.1,
+--   end
+
+-- }
+
+-- def conj (d : diagram) : diagram :=
+-- { vals := d.vals.image (prod.swap),
+
+-- }
 
 example {n : ℕ} (m : multiset ℕ)
   (hm₁ : ∀ i, i ∈ m → 0 < i)
