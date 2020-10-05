@@ -1,5 +1,5 @@
 import ring_theory.power_series
-import combinatorics.composition
+import combinatorics.partition
 import data.nat.parity
 import data.finset.nat_antidiagonal
 import tactic.interval_cases
@@ -24,41 +24,8 @@ open finset
 open_locale big_operators
 open_locale classical
 
-/-- A partition of `n` is a multiset of positive integers summing to `n`. -/
-@[ext, derive decidable_eq] structure partition (n : ℕ) :=
-(blocks : multiset ℕ)
-(blocks_pos : ∀ {i}, i ∈ blocks → 0 < i)
-(blocks_sum : blocks.sum = n)
-
-/-- A composition induces a partition (just convert the list to a multiset). -/
-def composition_to_partition (n : ℕ) (c : composition n) : partition n :=
-{ blocks := c.blocks,
-  blocks_pos := λ i hi, c.blocks_pos hi,
-  blocks_sum := by rw [multiset.coe_sum, c.blocks_sum] }
-
-/--
-Show there are finitely many partitions by considering the surjection from compositions to
-partitions.
--/
-instance (n : ℕ) : fintype (partition n) :=
-begin
-  apply fintype.of_surjective (composition_to_partition n),
-  rintro ⟨_, _, _⟩,
-  rcases quotient.exists_rep b_blocks with ⟨_, rfl⟩,
-  refine ⟨⟨w, λ i hi, b_blocks_pos hi, _⟩, partition.ext _ _ rfl⟩,
-  simpa using b_blocks_sum,
-end
-
 def partial_odd_gf (n : ℕ) [field α] := ∏ i in range n, (1 - (X : power_series α)^(2*i+1))⁻¹
 def partial_distinct_gf (n : ℕ) [comm_semiring α] := ∏ i in range n, (1 + (X : power_series α)^(i+1))
-
-def odd_partition (n : ℕ) := {c : partition n // ∀ i ∈ c.blocks, ¬ nat.even i}
-def distinct_partition (n : ℕ) := {c : partition n // multiset.nodup c.blocks}
-
-instance (n : ℕ) : fintype (odd_partition n) :=
-subtype.fintype _
-instance (n : ℕ) : fintype (distinct_partition n) :=
-subtype.fintype _
 
 /--
 Functions defined only on `s`, which sum to `n`. In other words, a partition of `n` indexed by `s`.
@@ -363,13 +330,13 @@ lemma sum_sum {β : Type*} [add_comm_monoid β] (f : α → multiset β) (s : fi
 (sum_hom s multiset.sum).symm
 
 lemma partial_gf_prop (α : Type*) [comm_semiring α] (n : ℕ) (s : finset ℕ) (hs : ∀ i ∈ s, 0 < i) (c : ℕ → set ℕ) (hc : ∀ i ∉ s, 0 ∈ c i) :
-  (finset.card ((univ : finset (partition n)).filter (λ p, (∀ j, p.blocks.count j ∈ c j) ∧ ∀ j ∈ p.blocks, j ∈ s)) : α) =
+  (finset.card ((univ : finset (partition n)).filter (λ p, (∀ j, p.parts.count j ∈ c j) ∧ ∀ j ∈ p.parts, j ∈ s)) : α) =
   (coeff α n) (∏ (i : ℕ) in s, indicator_series α ((* i) '' c i)) :=
 begin
   simp_rw [coeff_prod_range, coeff_indicator, prod_boole, sum_boole],
   congr' 1,
   refine card_eq_of_bijection _ _ _ _,
-  { intros p i, apply multiset.count i p.blocks * i },
+  { intros p i, apply multiset.count i p.parts * i },
   { simp only [mem_filter, mem_cut, mem_univ, true_and, exists_prop, and_assoc, and_imp,
                nat.mul_eq_zero, function.embedding.coe_fn_mk, exists_imp_distrib],
     rintro ⟨p, hp₁, hp₂⟩ hp₃ hp₄,
@@ -431,8 +398,8 @@ begin
     { rwa nat.mul_left_inj i.succ_pos at h } },
 end
 
-lemma partial_odd_gf_prop (n m : ℕ) [field α] :
-  (finset.card ((univ : finset (partition n)).filter (λ p, ∀ j ∈ p.blocks, j ∈ (range m).map mk_odd)) : α) =
+lemma partial_odd_gf_prop [field α] (n m : ℕ) :
+  (finset.card ((univ : finset (partition n)).filter (λ p, ∀ j ∈ p.parts, j ∈ (range m).map mk_odd)) : α) =
     coeff α n (partial_odd_gf m) :=
 begin
   rw partial_odd_gf,
@@ -458,17 +425,17 @@ begin
 end
 
 /--  If m is big enough, the partial product's coefficient counts the number of odd partitions -/
-theorem odd_gf_prop (n m : ℕ) (h : n < m * 2) [field α] :
-  (fintype.card (odd_partition n) : α) = coeff α n (partial_odd_gf m) :=
+theorem odd_gf_prop [field α] (n m : ℕ) (h : n < m * 2) :
+  (finset.card (partition.odds n) : α) = coeff α n (partial_odd_gf m) :=
 begin
-  erw [fintype.subtype_card, ← partial_odd_gf_prop],
+  rw [← partial_odd_gf_prop],
   congr' 2,
   apply filter_congr,
   intros p hp,
   apply ball_congr,
   intros i hi,
   have : i ≤ n,
-  { simpa [p.blocks_sum] using multiset.single_le_sum (λ _ _, nat.zero_le _) _ hi },
+  { simpa [p.parts_sum] using multiset.single_le_sum (λ _ _, nat.zero_le _) _ hi },
   simp only [mk_odd, exists_prop, mem_range, function.embedding.coe_fn_mk, mem_map],
   split,
     intro hi₂,
@@ -483,9 +450,8 @@ begin
   apply nat.two_not_dvd_two_mul_add_one,
 end
 
-
-lemma partial_distinct_gf_prop (n m : ℕ) [comm_semiring α] :
-  (finset.card ((univ : finset (partition n)).filter (λ p, p.blocks.nodup ∧ ∀ j ∈ p.blocks, j ∈ (range m).map ⟨nat.succ, nat.succ_injective⟩)) : α) =
+lemma partial_distinct_gf_prop [comm_semiring α] (n m : ℕ) :
+  (finset.card ((univ : finset (partition n)).filter (λ p, p.parts.nodup ∧ ∀ j ∈ p.parts, j ∈ (range m).map ⟨nat.succ, nat.succ_injective⟩)) : α) =
   coeff α n (partial_distinct_gf m) :=
 begin
   rw partial_distinct_gf,
@@ -500,7 +466,7 @@ begin
     rw [set.mem_insert_iff, set.mem_singleton_iff],
     split,
     { intro hi,
-      interval_cases (multiset.count i p.blocks),
+      interval_cases (multiset.count i p.parts),
       left, assumption,
       right, assumption },
     { rintro (h | h);
@@ -518,27 +484,27 @@ begin
 end
 
 /--  If m is big enough, the partial product's coefficient counts the number of distinct partitions -/
-theorem distinct_gf_prop (n m : ℕ) (h : n < m + 1) [comm_semiring α] :
-  (fintype.card (distinct_partition n) : α) = coeff α n (partial_distinct_gf m) :=
+theorem distinct_gf_prop [comm_semiring α] (n m : ℕ) (h : n < m + 1) :
+  ((partition.distincts n).card : α) = coeff α n (partial_distinct_gf m) :=
 begin
-  erw [fintype.subtype_card, ← partial_distinct_gf_prop],
+  erw [← partial_distinct_gf_prop],
   congr' 2,
   apply filter_congr,
   intros p hp,
   apply (and_iff_left _).symm,
   intros i hi,
   have : i ≤ n,
-    simpa [p.blocks_sum] using multiset.single_le_sum (λ _ _, nat.zero_le _) _ hi,
+    simpa [p.parts_sum] using multiset.single_le_sum (λ _ _, nat.zero_le _) _ hi,
   simp only [mk_odd, exists_prop, mem_range, function.embedding.coe_fn_mk, mem_map],
   refine ⟨i-1, _, _⟩,
   rw nat.sub_lt_right_iff_lt_add,
   apply lt_of_le_of_lt ‹i ≤ n› h,
-  apply p.blocks_pos hi,
+  apply p.parts_pos hi,
   apply nat.succ_pred_eq_of_pos,
-  apply p.blocks_pos hi,
+  apply p.parts_pos hi,
 end
 
-lemma same_gf (n : ℕ) [field α] :
+lemma same_gf [field α] (n : ℕ) :
   partial_odd_gf n * (range n).prod (λ i, (1 - (X : power_series α)^(n+i+1))) = partial_distinct_gf n :=
 begin
   rw [partial_odd_gf, partial_distinct_gf],
@@ -564,7 +530,7 @@ begin
   simp [zero_pow],
 end
 
-lemma coeff_prod_one_add (n : ℕ) [comm_semiring α] (φ ψ : power_series α) (h : ↑n < ψ.order) :
+lemma coeff_prod_one_add [comm_semiring α] (n : ℕ) (φ ψ : power_series α) (h : ↑n < ψ.order) :
   coeff α n (φ * ψ) = 0 :=
 begin
   rw [coeff_mul],
@@ -583,37 +549,41 @@ begin
   apply le_refl,
 end
 
-lemma coeff_prod_one_sub (n : ℕ) [comm_ring α] (φ ψ : power_series α) (h : ↑n < ψ.order) :
+lemma coeff_prod_one_sub [comm_ring α] (n : ℕ) {φ ψ : power_series α} (h : ↑n < ψ.order) :
   coeff α n (φ * (1 - ψ)) = coeff α n φ :=
 by rw [mul_sub, mul_one, add_monoid_hom.map_sub, coeff_prod_one_add _ _ _ h, sub_zero]
 
-lemma same_coeffs (n m : ℕ) (h : m ≤ n) [field α] :
+lemma coeff_big_prod_one_sub {ι : Type*} [comm_ring α] (k : ℕ) (s : finset ι) (φ : power_series α)
+  (f : ι → power_series α) :
+  (∀ i ∈ s, ↑k < (f i).order) → coeff α k (φ * ∏ i in s, (1 - f i)) = coeff α k φ :=
+begin
+  apply finset.induction_on s,
+  { simp },
+  { intros a s ha ih t,
+    simp only [mem_insert, forall_eq_or_imp] at t,
+    rw [finset.prod_insert ha, ← mul_assoc, mul_right_comm, coeff_prod_one_sub _ t.1],
+    exact ih t.2 },
+end
+
+lemma same_coeffs [field α] (n m : ℕ) (h : m ≤ n) :
   coeff α m (partial_odd_gf n) = coeff α m (partial_distinct_gf n) :=
 begin
   rw ← same_gf,
-  set! k := n with h,
-  apply_fun range at h,
-  rw ← h,
-  clear_value k, clear h,
-  induction k,
-    simp,
-  rwa [prod_range_succ, ← mul_assoc, mul_right_comm, coeff_prod_one_sub],
-  simp only [enat.coe_one, enat.coe_add, order_X_pow],
+  rw coeff_big_prod_one_sub,
+  simp only [mem_range, order_X_pow],
+  intros i hi,
   norm_cast,
   rw nat.lt_succ_iff,
   apply le_add_right,
   assumption,
 end
 
-theorem freek (n : ℕ) : fintype.card (odd_partition n) = fintype.card (distinct_partition n) :=
+theorem freek (n : ℕ) : (partition.odds n).card = (partition.distincts n).card :=
 begin
   -- We need the counts to live in some field (which contains ℕ), so let's just use ℚ
-  suffices : (fintype.card (odd_partition n) : ℚ) = fintype.card (distinct_partition n),
+  suffices : ((partition.odds n).card : ℚ) = (partition.distincts n).card,
     norm_cast at this, assumption,
-  rw distinct_gf_prop _ (n+1),
-  rw odd_gf_prop _ (n+1),
-  apply same_coeffs,
-  linarith,
-  linarith,
-  linarith,
+  rw distinct_gf_prop n (n+1) (by linarith),
+  rw odd_gf_prop n (n+1) (by linarith),
+  apply same_coeffs (n+1) n (by linarith),
 end
