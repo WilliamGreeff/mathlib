@@ -457,20 +457,6 @@ begin
     apply nat.succ_pos },
 end
 
-lemma multiset.single_le_sum {a : ℕ} (s : multiset ℕ) :
-  a ∈ s → a ≤ s.sum :=
-begin
-  apply multiset.induction_on s,
-    simp,
-  rintros b s₁ ih h,
-  rw multiset.sum_cons,
-  rw multiset.mem_cons at h,
-  rcases h with rfl | _,
-  exact nat.le.intro rfl,
-  apply le_add_left,
-  apply ih h,
-end
-
 /--  If m is big enough, the partial product's coefficient counts the number of odd partitions -/
 theorem odd_gf_prop (n m : ℕ) (h : n < m * 2) [field α] :
   (fintype.card (odd_partition n) : α) = coeff α n (partial_odd_gf m) :=
@@ -482,7 +468,7 @@ begin
   apply ball_congr,
   intros i hi,
   have : i ≤ n,
-    simpa [p.blocks_sum] using multiset.single_le_sum _ hi,
+  { simpa [p.blocks_sum] using multiset.single_le_sum (λ _ _, nat.zero_le _) _ hi },
   simp only [mk_odd, exists_prop, mem_range, function.embedding.coe_fn_mk, mem_map],
   split,
     intro hi₂,
@@ -542,7 +528,7 @@ begin
   apply (and_iff_left _).symm,
   intros i hi,
   have : i ≤ n,
-    simpa [p.blocks_sum] using multiset.single_le_sum _ hi,
+    simpa [p.blocks_sum] using multiset.single_le_sum (λ _ _, nat.zero_le _) _ hi,
   simp only [mk_odd, exists_prop, mem_range, function.embedding.coe_fn_mk, mem_map],
   refine ⟨i-1, _, _⟩,
   rw nat.sub_lt_right_iff_lt_add,
