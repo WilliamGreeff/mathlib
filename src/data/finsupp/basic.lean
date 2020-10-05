@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Johannes Hölzl, Scott Morrison
 -/
 import algebra.big_operators.order
-import algebra.module.basic
+import algebra.module.linear_map
 import data.fintype.card
 import data.finset.preimage
 import data.multiset.antidiagonal
