@@ -6,16 +6,16 @@ Authors: Bhavik Mehta
 
 import combinatorics.composition
 import data.nat.parity
-import data.finsupp.basic
 import tactic.apply_fun
 
 /-!
 # Partitions
 
-A partition of an integer `n` is a way of writing `n` as a sum of positive integers, where the order
-does not matter: two sums that differ only in the order of their summands are considered the same
-partition. This notion is closely related to that of a composition of `n`, but in a composition of
-`n` the order does matter.
+A partition of a natural number `n` is a way of writing `n` as a sum of positive integers, where the
+order does not matter: two sums that differ only in the order of their summands are considered the
+same partition. This notion is closely related to that of a composition of `n`, but in a composition
+of `n` the order does matter.
+A summand of the partition is called a part.
 
 ## Main functions
 
@@ -67,20 +67,12 @@ begin
   simpa using hb₂
 end
 
-lemma multiset.sum_eq_zero_iff (l : multiset ℕ) : l.sum = 0 ↔ ∀ x ∈ l, x = 0 :=
-begin
-  apply multiset.induction_on l,
-  { simp },
-  intros x l ih,
-  simp only [mem_cons, sum_cons, add_eq_zero_iff, ih],
-  split,
-  { rintro ⟨rfl, t⟩ y (rfl | b),
-    { refl },
-    { apply t _ ‹y ∈ l› } },
-  { intro t,
-    exact ⟨t _ (or.inl rfl), λ _ h, t _ (or.inr h)⟩ },
-end
-
+/--
+Given a multiset which sums to `n`, construct a partition of `n` with the same multiset, but
+without the zeros.
+-/
+-- The argument `n` is kept explicit here since it is useful in tactic mode proofs to generate the
+-- proof obligation `l.sum = n`.
 def of_sums (n : ℕ) (l : multiset ℕ) (hl : l.sum = n) : partition n :=
 { parts := l.filter (≠ 0),
   parts_pos := λ i hi, nat.pos_of_ne_zero $ by apply of_mem_filter hi,
@@ -94,27 +86,29 @@ def of_sums (n : ℕ) (l : multiset ℕ) (hl : l.sum = n) : partition n :=
     simpa [lz, hl] using lt,
   end }
 
-@[simp] theorem count_filter_of_neg {p} [decidable_pred p] [decidable_eq α]
-  {a} {s : multiset α} (h : ¬ p a) : count a (filter p s) = 0 :=
-multiset.induction_on s (by simp)
-begin
-  intros b s' ih,
-  by_cases h₁ : p b,
-  { rw [filter_cons_of_pos _ h₁, count_cons_of_ne, ih],
-    rintro t, apply h (t.symm ▸ h₁) },
-  { rw [filter_cons_of_neg _ h₁, ih] }
-end
+/-- A `multiset ℕ` induces a partition on its sum. -/
+def of_multiset (l : multiset ℕ) : partition l.sum :=
+of_sums _ l rfl
 
--- lemma count_of_sums_of_ne_zero {n : ℕ} {l : multiset ℕ} (hl : l.sum = n) {i : ℕ} (hi : i ≠ 0) :
---   (of_sums n l hl).parts.count i = l.count i :=
--- count_filter hi
+/-- The partition of exactly one part. -/
+def indiscrete_partition (n : ℕ) : partition n :=
+of_sums n {n} rfl
+
+instance {n : ℕ} : inhabited (partition n) := ⟨indiscrete_partition n⟩
+
+/--
+The number of times a positive integer `i` appears in the partition `of_sums n l hl` is the same
+as the number of times it appears in the multiset `l`.
+(For `i = 0`, `partition.non_zero` combined with `multiset.count_eq_zero_of_not_mem` gives that
+this is `0` instead.)
+-/
+lemma count_of_sums_of_ne_zero {n : ℕ} {l : multiset ℕ} (hl : l.sum = n) {i : ℕ} (hi : i ≠ 0) :
+  (of_sums n l hl).parts.count i = l.count i :=
+count_filter_of_pos hi
 
 lemma count_of_sums_zero {n : ℕ} {l : multiset ℕ} (hl : l.sum = n) :
   (of_sums n l hl).parts.count 0 = 0 :=
-begin
-  apply count_filter_of_neg,
-  simp,
-end
+count_filter_of_neg (λ h, h rfl)
 
 /--
 Show there are finitely many partitions by considering the surjection from compositions to
@@ -123,87 +117,15 @@ partitions.
 instance (n : ℕ) : fintype (partition n) :=
 fintype.of_surjective (of_composition n) of_composition_surj
 
-def test : partition 10 := ⟨⟦[5,4,1]⟧, by tidy, by simp⟩
-
-structure diagram :=
-(vals : finset (ℕ × ℕ))
-(lc : ∀ i j, (i+1,j) ∈ vals → (i,j) ∈ vals)
-(uc : ∀ i j, (i,j+1) ∈ vals → (i,j) ∈ vals)
-
-def test2 : diagram :=
-⟨list.to_finset [(0,0), (1,0), (2,0), (3,0), (4,0), (0,1), (1,1), (2,1), (3,1), (0,2)], sorry, sorry⟩
-
-#eval test2.vals.1.map prod.snd
-
-def increasing_list_to_diagram (l : list ℕ) : list (ℕ × ℕ) :=
-(l.map_with_index (λ i v, (list.range v).map (λ t, (i, t)))).join
-
-lemma inc_list_nodup (l : list ℕ) : (increasing_list_to_diagram l).nodup :=
-begin
-  rw [increasing_list_to_diagram, list.nodup_join],
-  split,
-  { intros l₁ hl₁,
-
-  }
-
-end
-
--- def partition_to_diagram {n : ℕ} (p : partition n) : diagram :=
--- { vals :=
---   begin
-
---   end
-
--- }
-
--- def diagram_to_partition {n : ℕ} (d : diagram) (hd : d.vals.card = n) :
---   partition n :=
--- { parts :=
---   begin
-
---     -- have := d.vals.1,
---   end
-
--- }
-
--- def conj (d : diagram) : diagram :=
--- { vals := d.vals.image (prod.swap),
-
--- }
-
-example {n : ℕ} (m : multiset ℕ)
-  (hm₁ : ∀ i, i ∈ m → 0 < i)
-  (hm₂ : m.sum = n) :
-  (map (λ i, countp (λ j, i < j) m) (range n)).sum = n :=
-begin
-
-end
-
-def conjugate {n : ℕ} (p : partition n) : partition n :=
-of_sums n ((range n).map (λ i, p.parts.countp (λ j, i < j)))
-begin
-  rcases p with ⟨m, hm₁, hm₂⟩,
-  change multiset.sum ((range n).map (λ i, countp (λ j, i < j) m)) = n,
-  extract_goal,
-end
--- { parts := ((range n).map (λ i, p.parts.countp (λ j, i < j))).filter (λ q, 0 < q),
---   parts_pos := λ i, multiset.of_mem_filter,
---   parts_sum :=
---   begin
---     suffices : (((range n).map (λ i, p.parts.countp (λ j, i < j)))).sum = n,
---     have := multiset.filter_add_not,
---   end
--- }
-
 /-- The finset of those partitions in which every part is odd. -/
-def odd_partition (n : ℕ) : finset (partition n) :=
+def odds (n : ℕ) : finset (partition n) :=
 finset.univ.filter (λ c, ∀ i ∈ c.parts, ¬ even i)
 
 /-- The finset of those partitions in which each part is used at most once. -/
-def distinct_partition (n : ℕ) : finset (partition n) :=
+def distincts (n : ℕ) : finset (partition n) :=
 finset.univ.filter (λ c, c.parts.nodup)
 
 /-- The finset of those partitions in which every part is odd and used at most once. -/
-def odd_distinct_partition (n : ℕ) : finset (partition n) := odd_partition n ∩ distinct_partition n
+def odd_distincts (n : ℕ) : finset (partition n) := odds n ∩ distincts n
 
 end partition
